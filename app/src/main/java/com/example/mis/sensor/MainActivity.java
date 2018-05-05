@@ -5,42 +5,57 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.media.AudioManager;
+import android.media.MediaPlayer;
 import android.os.AsyncTask;
 import android.os.Handler;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
+import android.widget.Button;
 import android.widget.SeekBar;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import java.util.ArrayList;
+import java.util.Locale;
 
-public class MainActivity extends AppCompatActivity implements SensorEventListener, SeekBar.OnSeekBarChangeListener {
+public class MainActivity extends AppCompatActivity implements SensorEventListener, SeekBar.OnSeekBarChangeListener, View.OnClickListener {
 
 
     //sensor variables
     private SensorManager mSensorManager;
     private Sensor mAccelerometer;
 
+    //views
     private CustomGraphView sensor_data_view;
     private CustomGraphView fft_view;
+
+    private TextView window_size_label;
+    private TextView sample_rate_label;
 
     private SeekBar window_size_seek_bar;
     private SeekBar sample_rate_seek_bar;
 
+    private Button test_btn;
 
-
-
+    //visual parameters
     private final int DARK_BG = 0xff222222;
     private final int LIGHT_BG = 0xffaaaaaa;
     private final int GRAPH_X_RESOLUTION = 50;
     private final float SENSOR_GRAPH_SCALE_Y = 0.005f;
     private final float FFT_GRAPH_SCALE_Y = 0.3f;
-    private final int FFT_WINDOW_SIZE = 64;
 
-    private Handler handler;
+    //sensor parameters
+    private int SENSOR_SAMPLE_DELAY = 20000; //  sensor delay: game
+    private int SENSOR_SAMPLE_RATE = 1000000/SENSOR_SAMPLE_DELAY;
+    private int FFT_WINDOW_SIZE = 64;
 
+    //data log
     private ArrayList<AccelOutput> accelData = new ArrayList<>();
+
+    private MediaPlayer mediaPlayer;
 
     private static final String TAG = MainActivity.class.getSimpleName();
 
@@ -62,22 +77,42 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         sensor_data_view = findViewById(R.id.sensor_input_view);
         fft_view = findViewById(R.id.fft_view);
 
+        //seek bar setup
         sample_rate_seek_bar = findViewById(R.id.sample_rate_seek_bar);
         window_size_seek_bar = findViewById(R.id.window_size_seek_bar);
 
-        visualiseSensorData();
+        sample_rate_seek_bar.setMax(99); //1 -> 100 : range of values
+        window_size_seek_bar.setMax(6); // 10 - 4 range of values
 
-        //start FFT timer
-        handler = new Handler();
+        window_size_seek_bar.setProgress(2);//hard code - could implement log2 function to derive from window size
+        sample_rate_seek_bar.setProgress(SENSOR_SAMPLE_RATE - 1);//adjust for range of seekbar
+
+        window_size_label = findViewById(R.id.window_size_label);
+        sample_rate_label = findViewById(R.id.sample_rate_label);
+
+        window_size_label.setText(String.format(Locale.getDefault(),
+                "%s %d",getResources().getString(R.string.window_size_label), FFT_WINDOW_SIZE));
+        sample_rate_label.setText(String.format(Locale.getDefault(),
+                "%s %dHz",getResources().getString(R.string.sample_rate_label), SENSOR_SAMPLE_RATE));
+
+        visualiseSensorData();
+        
+        test_btn = findViewById(R.id.test_btn);
+        test_btn.setOnClickListener(this);
+
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        mSensorManager.registerListener(this, mAccelerometer, SensorManager.SENSOR_DELAY_GAME);
+        mSensorManager.registerListener(this, mAccelerometer, SENSOR_SAMPLE_DELAY);
 
         sample_rate_seek_bar.setOnSeekBarChangeListener(this);
         window_size_seek_bar.setOnSeekBarChangeListener(this);
+
+
+//        MediaPlayer mediaPlayer = new MediaPlayer();
+//        mediaPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
 
     }
 
@@ -86,9 +121,11 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         super.onPause();
         mSensorManager.unregisterListener(this);
 
-        //deregister as seek bar listener?
+        if (mediaPlayer != null){
+            mediaPlayer.release();
+            mediaPlayer = null;
+        }
 
-        //stop handler task 
     }
 
 
@@ -99,7 +136,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
         if (mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) != null) {
             mAccelerometer = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
-            Log.d(TAG, "sensorInit: accelerometer found");
+
+            Log.d(TAG, "sensorInit: accelerometer found, min delay: " + mAccelerometer.getMinDelay());
         }
         else {
             Log.d(TAG, "sensorInit: accelerometer not found");
@@ -108,41 +146,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         return true;
     }
 
-    //help from https://examples.javacodegeeks.com/android/core/os/handler/android-handler-example/
-//    class Task implements Runnable {
-//        @Override
-//        public void run() {
-//
-//            handler.post(new Runnable() {
-//                @Override
-//                public void run() {
-//
-//                    try {
-//                        Thread.sleep(1000);
-//                    } catch (InterruptedException e) {
-//                        e.printStackTrace();
-//                        Log.d(TAG, "run: thread sleep interrupted");
-//                    }
-//
-//                    //create list of double values if there is enough accelerometer data
-//                    if (accelData.size() > FFT_WINDOW_SIZE){
-//                        double[] magnitude_data = new double[FFT_WINDOW_SIZE];
-//                        for (int j = 0; j < FFT_WINDOW_SIZE; j++){
-//                            float FFT_SCALING = 0.01f;
-//                            magnitude_data[j] = FFT_SCALING * accelData.get(accelData.size() - (j + 1)).magnitude;
-//                        }
-//
-//                        //start fft process
-////                        new FFTAsynctask(FFT_WINDOW_SIZE).execute(magnitude_data);
-//                    }
-//
-//                    //call this task again
-//                    handler.post(this);
-//
-//                }
-//            });
-//        }
-//    }
+    private void resetSensorDelay(){
+        mSensorManager.unregisterListener(this);
+        mSensorManager.registerListener(this, mAccelerometer,SENSOR_SAMPLE_DELAY);
+    }
 
 
     //sends sensor data to line graph display
@@ -171,15 +178,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         }
 
         sensor_data_view.updateData(dataSets, DARK_BG);
-
-
-//        final ArrayList<DrawableDataSet> final_sets = dataSets;
-//        runOnUiThread(new Runnable() {
-//            public void run() {
-//                sensor_data_view.updateData(final_sets, DARK_BG);
-//            }
-//        });
-
 
     }
 
@@ -221,22 +219,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             visualiseSensorData();
             new FFTAsynctask(FFT_WINDOW_SIZE).execute(accelData);
 
-
-            //create list of double values if there is enough accelerometer data
-//            if (accelData.size() > FFT_WINDOW_SIZE){
-//                double[] magnitude_data = new double[FFT_WINDOW_SIZE];
-//                for (int j = 0; j < FFT_WINDOW_SIZE; j++){
-//                    float FFT_SCALING = 0.01f;
-//                    magnitude_data[j] = FFT_SCALING * accelData.get(accelData.size() - (j + 1)).magnitude;
-//                }
-//
-//                //start fft process
-//                new FFTAsynctask(FFT_WINDOW_SIZE).execute(magnitude_data);
-//            }
-
-//            new SensorGraphTask().execute(accelData);
-
-
         }
     }
 
@@ -244,8 +226,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     public void onAccuracyChanged(Sensor sensor, int accuracy) {
 
     }
-
-
 
 
     /**
@@ -295,8 +275,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             //fill array with magnitude values of the distribution
             for (int i = 0; (wsize/2 + 1) > i ; i++) {
                 magnitude[i] = FFT_GRAPH_SCALE_Y * Math.sqrt(Math.pow(realPart[i], 2) + Math.pow(imagPart[i], 2));
-
-//                magnitude[i] = 20 * Math.log10(Math.sqrt(Math.pow(realPart[i], 2) + Math.pow(imagPart[i], 2)));
             }
 
             return magnitude;
@@ -307,8 +285,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         protected void onPostExecute(double[] values) {
             //hand over values to global variable after background task is finished
             visualiseFFTData(values);
-
-
         }
     }
 
@@ -317,12 +293,25 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
         if (seekBar.getId() == R.id.sample_rate_seek_bar){
 
+            SENSOR_SAMPLE_RATE = (sample_rate_seek_bar.getProgress() + 1);
+            SENSOR_SAMPLE_DELAY = 1000000/SENSOR_SAMPLE_RATE;
 
-            //TODO do stuff
+            resetSensorDelay();
+
+            sample_rate_label.setText(String.format(Locale.getDefault(),
+                    "%s %dHz",getResources().getString(R.string.sample_rate_label), SENSOR_SAMPLE_RATE));
+
+
+
         }
         else if (seekBar.getId() == R.id.window_size_seek_bar){
 
-            //TODO do stuff
+
+            FFT_WINDOW_SIZE = (int)Math.pow(2.0, seekBar.getProgress() + 4);
+
+            //update label
+            window_size_label.setText(String.format(Locale.getDefault(),
+                    "%s %d",getResources().getString(R.string.window_size_label), FFT_WINDOW_SIZE));
         }
     }
 
@@ -348,5 +337,15 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 //    }
 
 
+    //button for testing
+    @Override
+    public void onClick(View v) {
+        
+        if (v == test_btn){
+
+            mediaPlayer = MediaPlayer.create(this, R.raw.running_music);
+            mediaPlayer.start();
+        }
+    }
 
 }
