@@ -25,13 +25,14 @@ import java.util.Random;
 import java.util.Timer;
 import java.util.TimerTask;
 
+import static android.os.SystemClock.uptimeMillis;
+
 public class MainActivity extends AppCompatActivity implements SensorEventListener  {
 
 
     //sensor variables
     private SensorManager mSensorManager;
     private Sensor mAccelerometer;
-//    private Sensor mGravity;
 
     private CustomGraphView sensor_data_view;
     private CustomGraphView fft_view;
@@ -48,6 +49,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private ArrayList<AccelOutput> accelData = new ArrayList<>();
 
     private static final String TAG = MainActivity.class.getSimpleName();
+
+    //testing
+//    private int refresh_count = 0;
+//    private long lastReport = 0;
 
 
 
@@ -74,7 +79,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         super.onResume();
         mSensorManager.registerListener(this, mAccelerometer, SensorManager.SENSOR_DELAY_GAME);
 
-        new Thread(new Task()).start();
+//        new Thread(new Task()).start();
     }
 
     @Override
@@ -103,37 +108,40 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     }
 
     //help from https://examples.javacodegeeks.com/android/core/os/handler/android-handler-example/
-    class Task implements Runnable {
-        @Override
-        public void run() {
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-            handler.post(new Runnable() {
-                @Override
-                public void run() {
-
-                    //create list of double values if there is enough accelerometer data
-                    if (accelData.size() > WINDOW_SIZE){
-                        double[] magnitude_data = new double[WINDOW_SIZE];
-                        for (int j = 0; j < WINDOW_SIZE; j++){
-                            float FFT_SCALING = 0.01f;
-                            magnitude_data[j] = FFT_SCALING * accelData.get(accelData.size() - (j + 1)).magnitude;
-                        }
-
-                        //start fft process
-                        new FFTAsynctask(WINDOW_SIZE).execute(magnitude_data);
-                    }
-
-
-                    handler.post(this);
-
-                }
-            });
-        }
-    }
+//    class Task implements Runnable {
+//        @Override
+//        public void run() {
+//
+//            handler.post(new Runnable() {
+//                @Override
+//                public void run() {
+//
+//                    try {
+//                        Thread.sleep(1000);
+//                    } catch (InterruptedException e) {
+//                        e.printStackTrace();
+//                        Log.d(TAG, "run: thread sleep interrupted");
+//                    }
+//
+//                    //create list of double values if there is enough accelerometer data
+//                    if (accelData.size() > WINDOW_SIZE){
+//                        double[] magnitude_data = new double[WINDOW_SIZE];
+//                        for (int j = 0; j < WINDOW_SIZE; j++){
+//                            float FFT_SCALING = 0.01f;
+//                            magnitude_data[j] = FFT_SCALING * accelData.get(accelData.size() - (j + 1)).magnitude;
+//                        }
+//
+//                        //start fft process
+////                        new FFTAsynctask(WINDOW_SIZE).execute(magnitude_data);
+//                    }
+//
+//                    //call this task again
+//                    handler.post(this);
+//
+//                }
+//            });
+//        }
+//    }
 
 
     //sends sensor data to line graph display
@@ -162,9 +170,20 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
         sensor_data_view.updateData(dataSets, DARK_BG);
 
+
+//        final ArrayList<DrawableDataSet> final_sets = dataSets;
+//        runOnUiThread(new Runnable() {
+//            public void run() {
+//                sensor_data_view.updateData(final_sets, DARK_BG);
+//            }
+//        });
+
+
     }
 
     private void visualiseFFTData(double[] values){
+
+
 
         ArrayList<DrawableDataSet> dataSets = new ArrayList<>();
         float[] dataToDraw = new float[values.length];
@@ -189,7 +208,33 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER){
             float[] values = event.values;
             accelData.add(new AccelOutput(values[0], values[1], values[2]));
+
+//            refresh_count++;
+//            if ((int)(uptimeMillis() / 1000) != lastReport){
+//                Log.d(TAG, "onSensorChanged: refresh rate = " + refresh_count + "Hz");
+//                refresh_count = 0;
+//                lastReport = uptimeMillis()/1000;
+//            }
+
             visualiseSensorData();
+            new FFTAsynctask(WINDOW_SIZE).execute(accelData);
+
+
+            //create list of double values if there is enough accelerometer data
+//            if (accelData.size() > WINDOW_SIZE){
+//                double[] magnitude_data = new double[WINDOW_SIZE];
+//                for (int j = 0; j < WINDOW_SIZE; j++){
+//                    float FFT_SCALING = 0.01f;
+//                    magnitude_data[j] = FFT_SCALING * accelData.get(accelData.size() - (j + 1)).magnitude;
+//                }
+//
+//                //start fft process
+//                new FFTAsynctask(WINDOW_SIZE).execute(magnitude_data);
+//            }
+
+//            new SensorGraphTask().execute(accelData);
+
+
         }
     }
 
@@ -205,7 +250,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
      * fft(double[] x, double[] y)
      */
 
-    private class FFTAsynctask extends AsyncTask<double[], Void, double[]> {
+//    private class FFTAsynctask extends AsyncTask<double[], Void, double[]> {
+
+    private class FFTAsynctask extends AsyncTask<ArrayList<AccelOutput>, Void, double[]> {
 
         private int wsize; //window size must be power of 2
 
@@ -215,10 +262,20 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         }
 
         @Override
-        protected double[] doInBackground(double[]... values) {
+        protected double[] doInBackground(ArrayList<AccelOutput>... data) {
 
+            double[] values = new double[wsize];
 
-            double[] realPart = values[0].clone(); // actual acceleration values
+            //create list of double values if there is enough accelerometer data
+            if (data[0].size() > wsize){
+
+                for (int j = 0; j < wsize; j++){
+                    float FFT_SCALING = 0.01f;
+                    values[j] = FFT_SCALING * data[0].get(data[0].size() - (j + 1)).magnitude;
+                }
+            }
+
+            double[] realPart = values; // actual acceleration values
             double[] imagPart = new double[wsize]; // init empty
 
             /**
@@ -245,11 +302,20 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             //hand over values to global variable after background task is finished
             visualiseFFTData(values);
 
-//            Toast.makeText(MainActivity.this, "I did some FFT!", Toast.LENGTH_SHORT).show();
 
         }
     }
 
+
+//    private class SensorGraphTask extends AsyncTask<ArrayList<AccelOutput>, Void, Void>{
+//
+//        @Override
+//        protected Void doInBackground(ArrayList<AccelOutput>... arrayLists) {
+//
+//            visualiseSensorData();
+//            return null;
+//        }
+//    }
 
 
 
