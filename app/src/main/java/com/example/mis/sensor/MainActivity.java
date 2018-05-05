@@ -1,33 +1,21 @@
 package com.example.mis.sensor;
 
 import android.content.Context;
-import android.graphics.Canvas;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.os.AsyncTask;
 import android.os.Handler;
-import android.support.v4.content.res.TypedArrayUtils;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.MotionEvent;
-import android.view.View;
-import android.widget.FrameLayout;
-import android.widget.ImageView;
+import android.widget.SeekBar;
 import android.widget.Toast;
 
-import com.example.mis.sensor.FFT;
-
 import java.util.ArrayList;
-import java.util.Random;
-import java.util.Timer;
-import java.util.TimerTask;
 
-import static android.os.SystemClock.uptimeMillis;
-
-public class MainActivity extends AppCompatActivity implements SensorEventListener  {
+public class MainActivity extends AppCompatActivity implements SensorEventListener, SeekBar.OnSeekBarChangeListener {
 
 
     //sensor variables
@@ -37,12 +25,18 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private CustomGraphView sensor_data_view;
     private CustomGraphView fft_view;
 
+    private SeekBar window_size_seek_bar;
+    private SeekBar sample_rate_seek_bar;
+
+
+
 
     private final int DARK_BG = 0xff222222;
     private final int LIGHT_BG = 0xffaaaaaa;
     private final int GRAPH_X_RESOLUTION = 50;
-    private final float GRAPH_SCALE_Y = 0.005f;
-    private final int WINDOW_SIZE = 64;
+    private final float SENSOR_GRAPH_SCALE_Y = 0.005f;
+    private final float FFT_GRAPH_SCALE_Y = 0.3f;
+    private final int FFT_WINDOW_SIZE = 64;
 
     private Handler handler;
 
@@ -68,6 +62,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         sensor_data_view = findViewById(R.id.sensor_input_view);
         fft_view = findViewById(R.id.fft_view);
 
+        sample_rate_seek_bar = findViewById(R.id.sample_rate_seek_bar);
+        window_size_seek_bar = findViewById(R.id.window_size_seek_bar);
+
         visualiseSensorData();
 
         //start FFT timer
@@ -79,14 +76,18 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         super.onResume();
         mSensorManager.registerListener(this, mAccelerometer, SensorManager.SENSOR_DELAY_GAME);
 
-//        new Thread(new Task()).start();
+        sample_rate_seek_bar.setOnSeekBarChangeListener(this);
+        window_size_seek_bar.setOnSeekBarChangeListener(this);
+
     }
 
     @Override
     protected void onPause() {
         super.onPause();
         mSensorManager.unregisterListener(this);
-        
+
+        //deregister as seek bar listener?
+
         //stop handler task 
     }
 
@@ -124,15 +125,15 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 //                    }
 //
 //                    //create list of double values if there is enough accelerometer data
-//                    if (accelData.size() > WINDOW_SIZE){
-//                        double[] magnitude_data = new double[WINDOW_SIZE];
-//                        for (int j = 0; j < WINDOW_SIZE; j++){
+//                    if (accelData.size() > FFT_WINDOW_SIZE){
+//                        double[] magnitude_data = new double[FFT_WINDOW_SIZE];
+//                        for (int j = 0; j < FFT_WINDOW_SIZE; j++){
 //                            float FFT_SCALING = 0.01f;
 //                            magnitude_data[j] = FFT_SCALING * accelData.get(accelData.size() - (j + 1)).magnitude;
 //                        }
 //
 //                        //start fft process
-////                        new FFTAsynctask(WINDOW_SIZE).execute(magnitude_data);
+////                        new FFTAsynctask(FFT_WINDOW_SIZE).execute(magnitude_data);
 //                    }
 //
 //                    //call this task again
@@ -145,6 +146,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
 
     //sends sensor data to line graph display
+    //TODO consider calling this on an async task, as FFT display?
     private void visualiseSensorData(){
 
         ArrayList<DrawableDataSet> dataSets = new ArrayList<>();
@@ -159,7 +161,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             for (int i = GRAPH_X_RESOLUTION - 1; i >= 0; i--){
 
                 if (dataReadPos >= 0){
-                    dataToDraw[i] = (accelData.get(dataReadPos).get(lineNum) * GRAPH_SCALE_Y) + 0.5f;//scale and shift
+                    dataToDraw[i] = (accelData.get(dataReadPos).get(lineNum) * SENSOR_GRAPH_SCALE_Y) + 0.5f;//scale and shift
                     dataReadPos--;
                 }
             }
@@ -217,19 +219,19 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 //            }
 
             visualiseSensorData();
-            new FFTAsynctask(WINDOW_SIZE).execute(accelData);
+            new FFTAsynctask(FFT_WINDOW_SIZE).execute(accelData);
 
 
             //create list of double values if there is enough accelerometer data
-//            if (accelData.size() > WINDOW_SIZE){
-//                double[] magnitude_data = new double[WINDOW_SIZE];
-//                for (int j = 0; j < WINDOW_SIZE; j++){
+//            if (accelData.size() > FFT_WINDOW_SIZE){
+//                double[] magnitude_data = new double[FFT_WINDOW_SIZE];
+//                for (int j = 0; j < FFT_WINDOW_SIZE; j++){
 //                    float FFT_SCALING = 0.01f;
 //                    magnitude_data[j] = FFT_SCALING * accelData.get(accelData.size() - (j + 1)).magnitude;
 //                }
 //
 //                //start fft process
-//                new FFTAsynctask(WINDOW_SIZE).execute(magnitude_data);
+//                new FFTAsynctask(FFT_WINDOW_SIZE).execute(magnitude_data);
 //            }
 
 //            new SensorGraphTask().execute(accelData);
@@ -242,6 +244,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     public void onAccuracyChanged(Sensor sensor, int accuracy) {
 
     }
+
+
 
 
     /**
@@ -285,12 +289,14 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             FFT fft = new FFT(wsize);
             fft.fft(realPart, imagPart);
             //init new double array for magnitude (e.g. frequency count)
-            double[] magnitude = new double[wsize];
+            double[] magnitude = new double[wsize/2 + 1];
 
 
             //fill array with magnitude values of the distribution
-            for (int i = 0; wsize > i ; i++) {
-                magnitude[i] = Math.sqrt(Math.pow(realPart[i], 2) + Math.pow(imagPart[i], 2));
+            for (int i = 0; (wsize/2 + 1) > i ; i++) {
+                magnitude[i] = FFT_GRAPH_SCALE_Y * Math.sqrt(Math.pow(realPart[i], 2) + Math.pow(imagPart[i], 2));
+
+//                magnitude[i] = 20 * Math.log10(Math.sqrt(Math.pow(realPart[i], 2) + Math.pow(imagPart[i], 2)));
             }
 
             return magnitude;
@@ -304,6 +310,30 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
 
         }
+    }
+
+    @Override
+    public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+
+        if (seekBar.getId() == R.id.sample_rate_seek_bar){
+
+
+            //TODO do stuff
+        }
+        else if (seekBar.getId() == R.id.window_size_seek_bar){
+
+            //TODO do stuff
+        }
+    }
+
+    @Override
+    public void onStartTrackingTouch(SeekBar seekBar) {
+
+    }
+
+    @Override
+    public void onStopTrackingTouch(SeekBar seekBar) {
+
     }
 
 

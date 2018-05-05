@@ -1,3 +1,8 @@
 <resources>
     <string name="app_name">Sensor</string>
+    <string name="sensor_graph_title">Sensor Output:</string>
+    <string name="fft_graph_title">FFT Output:</string>
+    <string name="sample_rate_label">Sample Rate:</string>
+    <string name="window_size_label">Window Size:</string>
+
 </resources>

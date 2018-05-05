@@ -8,12 +8,28 @@
     android:weightSum="100"
     tools:context=".MainActivity">
 
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="5"
+        android:text="@string/sensor_graph_title"
+        android:padding="3dp"
+        />
+
 
     <com.example.mis.sensor.CustomGraphView
         android:id="@+id/sensor_input_view"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="50"
+        android:layout_weight="35"
+        />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="5"
+        android:text="@string/fft_graph_title"
+        android:padding="3dp"
         />
 
 
@@ -21,7 +37,37 @@
         android:id="@+id/fft_view"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="50"
+        android:layout_weight="35"
+        />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="5"
+        android:text="@string/sample_rate_label"
+        android:padding="3dp"
+        />
+
+    <SeekBar
+        android:id="@+id/sample_rate_seek_bar"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="5"
+        />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="5"
+        android:text="@string/window_size_label"
+        android:padding="3dp"
+        />
+
+    <SeekBar
+        android:id="@+id/window_size_seek_bar"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="5"
         />
 
 </LinearLayout>
