@@ -37,7 +37,7 @@ public class FFT {
     double[] sin;
 
     public FFT(int n) {
-        this.n = n;
+        this.n = n; // window size
         this.m = (int) (Math.log(n) / Math.log(2));
 
         // Make sure n is a power of 2
