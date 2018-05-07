@@ -12,6 +12,7 @@ import android.os.Handler;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
 import android.widget.SeekBar;
@@ -21,12 +22,22 @@ import android.widget.Toast;
 import java.util.ArrayList;
 import java.util.Locale;
 
+import static com.example.mis.sensor.MainActivity.ExerciseMode.CYCLING;
+import static com.example.mis.sensor.MainActivity.ExerciseMode.NONE;
+import static com.example.mis.sensor.MainActivity.ExerciseMode.RUNNING;
+
 public class MainActivity extends AppCompatActivity implements SensorEventListener, SeekBar.OnSeekBarChangeListener, View.OnClickListener {
 
+    public enum ExerciseMode {
+        NONE,
+        RUNNING,
+        CYCLING
+    }
 
     //sensor variables
     private SensorManager mSensorManager;
     private Sensor mAccelerometer;
+    private Sensor mLinearAccelerometer;
 
     //views
     private CustomGraphView sensor_data_view;
@@ -34,28 +45,34 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     private TextView window_size_label;
     private TextView sample_rate_label;
+    private TextView fft_dom_freq_label;
 
     private SeekBar window_size_seek_bar;
     private SeekBar sample_rate_seek_bar;
 
-    private Button test_btn;
+    private Button test_btn1;
+    private Button test_btn2;
 
     //visual parameters
     private final int DARK_BG = 0xff222222;
     private final int LIGHT_BG = 0xffaaaaaa;
     private final int GRAPH_X_RESOLUTION = 50;
-    private final float SENSOR_GRAPH_SCALE_Y = 0.005f;
+    private final float SENSOR_GRAPH_SCALE_Y = 0.01f;
     private final float FFT_GRAPH_SCALE_Y = 0.3f;
 
     //sensor parameters
     private int SENSOR_SAMPLE_DELAY = 20000; //  sensor delay: game
     private int SENSOR_SAMPLE_RATE = 1000000/SENSOR_SAMPLE_DELAY;
     private int FFT_WINDOW_SIZE = 64;
+    private double dominantFrequency = 0;
+    private double MOVEMENT_THRESHOLD = 1.0;
 
     //data log
     private ArrayList<AccelOutput> accelData = new ArrayList<>();
 
+    ExerciseMode exercisemode = NONE;
     private MediaPlayer mediaPlayer;
+//    private MusicHandler musicHandler;
 
     private static final String TAG = MainActivity.class.getSimpleName();
 
@@ -89,16 +106,24 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
         window_size_label = findViewById(R.id.window_size_label);
         sample_rate_label = findViewById(R.id.sample_rate_label);
+        fft_dom_freq_label = findViewById(R.id.fft_dom_freq_label);
 
         window_size_label.setText(String.format(Locale.getDefault(),
                 "%s %d",getResources().getString(R.string.window_size_label), FFT_WINDOW_SIZE));
         sample_rate_label.setText(String.format(Locale.getDefault(),
                 "%s %dHz",getResources().getString(R.string.sample_rate_label), SENSOR_SAMPLE_RATE));
 
+
         visualiseSensorData();
         
-        test_btn = findViewById(R.id.test_btn);
-        test_btn.setOnClickListener(this);
+        test_btn1 = findViewById(R.id.test_btn1);
+        test_btn1.setOnClickListener(this);
+        test_btn2 = findViewById(R.id.test_btn2);
+        test_btn2.setOnClickListener(this);
+
+//        musicHandler = new MusicHandler(this);
+//        musicHandler.load(R.raw.running_music, false);
+
 
     }
 
@@ -106,13 +131,16 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     protected void onResume() {
         super.onResume();
         mSensorManager.registerListener(this, mAccelerometer, SENSOR_SAMPLE_DELAY);
+        mSensorManager.registerListener(this, mLinearAccelerometer, SENSOR_SAMPLE_DELAY);
+
+
 
         sample_rate_seek_bar.setOnSeekBarChangeListener(this);
         window_size_seek_bar.setOnSeekBarChangeListener(this);
 
 
-//        MediaPlayer mediaPlayer = new MediaPlayer();
-//        mediaPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
+        mediaPlayer = new MediaPlayer();
+        mediaPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
 
     }
 
@@ -141,6 +169,16 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         }
         else {
             Log.d(TAG, "sensorInit: accelerometer not found");
+            return false;
+        }
+
+        if (mSensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION) != null) {
+            mLinearAccelerometer = mSensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION);
+
+            Log.d(TAG, "sensorInit: linear accelerometer found, min delay: " + mAccelerometer.getMinDelay());
+        }
+        else {
+            Log.d(TAG, "sensorInit: linear accelerometer not found");
             return false;
         }
         return true;
@@ -205,8 +243,25 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     public void onSensorChanged(SensorEvent event) {
 
         //if accel
-        if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER){
+        if (event.sensor.getType() == Sensor.TYPE_LINEAR_ACCELERATION){
             float[] values = event.values;
+
+            //from https://developer.android.com/reference/android/hardware/SensorEvent
+            // alpha is calculated as t / (t + dT)
+            // with t, the low-pass filter's time-constant
+            // and dT, the event delivery rate
+
+//            final float alpha = 0.8;
+//
+//            gravity[0] = alpha * gravity[0] + (1 - alpha) * event.values[0];
+//            gravity[1] = alpha * gravity[1] + (1 - alpha) * event.values[1];
+//            gravity[2] = alpha * gravity[2] + (1 - alpha) * event.values[2];
+//
+//            linear_acceleration[0] = event.values[0] - gravity[0];
+//            linear_acceleration[1] = event.values[1] - gravity[1];
+//            linear_acceleration[2] = event.values[2] - gravity[2];
+
+
             accelData.add(new AccelOutput(values[0], values[1], values[2]));
 
 //            refresh_count++;
@@ -273,9 +328,36 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
 
             //fill array with magnitude values of the distribution
-            for (int i = 0; (wsize/2 + 1) > i ; i++) {
-                magnitude[i] = FFT_GRAPH_SCALE_Y * Math.sqrt(Math.pow(realPart[i], 2) + Math.pow(imagPart[i], 2));
+            //dont use first bin in graph - it's the DC term
+            //find dominant freq at same time
+            double maxAmp = 0.0;
+            int maxBin = -1;
+            double DCcomp = Math.sqrt(Math.pow(realPart[0], 2));
+
+
+            for (int i = 0; (wsize/2) > i ; i++) {
+                magnitude[i] = FFT_GRAPH_SCALE_Y * Math.sqrt(Math.pow(realPart[i + 1], 2) + Math.pow(imagPart[i + 1], 2));
+                if (magnitude[i] > maxAmp){
+                    maxAmp = magnitude[i];
+                    maxBin = i + 1;//take index of fft output with biggest component
+                }
+
             }
+            //help from https://stackoverflow.com/questions/7674877/how-to-get-frequency-from-fft-result
+//            dominantFrequency = maxBin * SENSOR_SAMPLE_RATE * FFT_WINDOW_SIZE;
+
+            if (DCcomp > MOVEMENT_THRESHOLD){
+                dominantFrequency = 999;
+                setExercisemodeMode(RUNNING);
+            }
+
+            else{
+                dominantFrequency = 0;
+                setExercisemodeMode(NONE);
+            }
+
+
+//            dominantFrequency = maxBin;
 
             return magnitude;
 
@@ -285,6 +367,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         protected void onPostExecute(double[] values) {
             //hand over values to global variable after background task is finished
             visualiseFFTData(values);
+            fft_dom_freq_label.setText(String.format(Locale.getDefault(), "Dom. Freq. = %8.2f Hz", dominantFrequency));
         }
     }
 
@@ -337,15 +420,72 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 //    }
 
 
+
     //button for testing
     @Override
     public void onClick(View v) {
+
+
+        if (v == test_btn1){
+
+            if (exercisemode == NONE)
+                setExercisemodeMode(RUNNING);
+            else if (exercisemode == RUNNING)
+                setExercisemodeMode(NONE);
+
+//            if (mediaPlayer.isPlaying() && exercisemode == RUNNING){
+//                mediaPlayer.pause();
+//                exercisemode = NONE;
+//                return;
+//            }
+//            else if (mediaPlayer.isPlaying() && exercisemode == CYCLING){
+//                mediaPlayer.pause();
+//            }
+//            mediaPlayer = MediaPlayer.create(this, R.raw.running_music);
+//            exercisemode = RUNNING;
+
+        }
+//        else if (v == test_btn2){
+//            if (mediaPlayer.isPlaying() && exercisemode == CYCLING){
+//                mediaPlayer.pause();
+//                exercisemode = NONE;
+//                return;
+//            }
+//            else if (mediaPlayer.isPlaying() && exercisemode == RUNNING){
+//                mediaPlayer.pause();
+//            }
+//            mediaPlayer = MediaPlayer.create(this, R.raw.cycling_music);
+//            exercisemode = CYCLING;
+//        }
+//
+//        mediaPlayer.setLooping(true);
+//        mediaPlayer.start();
+
         
-        if (v == test_btn){
+
+    }
+
+    private void setExercisemodeMode (ExerciseMode targetMode){
+
+        if (targetMode == exercisemode)
+            return;//dont need to do anything
+
+        if (mediaPlayer.isPlaying())
+            mediaPlayer.pause();
+
+        if (targetMode == RUNNING){
 
             mediaPlayer = MediaPlayer.create(this, R.raw.running_music);
+            mediaPlayer.setLooping(true);
             mediaPlayer.start();
         }
+        else if (targetMode == CYCLING){
+            mediaPlayer = MediaPlayer.create(this, R.raw.cycling_music);
+            mediaPlayer.setLooping(true);
+            mediaPlayer.start();
+        }
+
+        exercisemode = targetMode;
     }
 
 }
