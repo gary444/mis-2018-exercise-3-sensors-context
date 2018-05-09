@@ -24,20 +24,30 @@
         android:layout_weight="30"
         />
 
-    <TextView
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="5"
-        android:text="@string/fft_graph_title"
-        android:padding="3dp"
-        />
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        >
 
-    <TextView
-        android:id="@+id/fft_dom_freq_label"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="5"
-        android:padding="3dp"/>
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="50"
+            android:text="@string/fft_graph_title"
+            android:padding="3dp"
+            />
+
+        <TextView
+            android:id="@+id/fft_dom_freq_label"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="50"
+            android:padding="3dp"/>
+
+    </LinearLayout>
+
+
 
 
     <com.example.mis.sensor.CustomGraphView
@@ -83,28 +93,52 @@
         android:max="10"
         />
 
-    <LinearLayout
+    <!--<LinearLayout-->
+        <!--android:layout_width="match_parent"-->
+        <!--android:layout_height="0dp"-->
+        <!--android:layout_weight="10"-->
+        <!--android:orientation="horizontal">-->
+
+        <!--<Button-->
+            <!--android:id="@+id/test_btn1"-->
+            <!--android:layout_width="wrap_content"-->
+            <!--android:layout_height="match_parent"-->
+            <!--android:layout_weight="50"-->
+            <!--android:text="running"-->
+            <!--/>-->
+        <!--<Button-->
+            <!--android:id="@+id/test_btn2"-->
+            <!--android:layout_width="wrap_content"-->
+            <!--android:layout_height="match_parent"-->
+            <!--android:layout_weight="50"-->
+            <!--android:text="cycling"-->
+            <!--/>-->
+
+    <!--</LinearLayout>-->
+
+    <TextView
+        android:id="@+id/mode_output"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="10"
-        android:orientation="horizontal">
+        android:layout_weight="5"
+        android:padding="3dp"
+        />
 
-        <Button
-            android:id="@+id/test_btn1"
-            android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:layout_weight="50"
-            android:text="running"
-            />
-        <Button
-            android:id="@+id/test_btn2"
-            android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:layout_weight="50"
-            android:text="cycling"
-            />
+    <TextView
+        android:id="@+id/speed_output"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="5"
+        android:padding="3dp"
+        />
 
-    </LinearLayout>
+    <TextView
+        android:id="@+id/fft_energy_output"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="5"
+        android:padding="3dp"
+        />
 
 
 </LinearLayout>

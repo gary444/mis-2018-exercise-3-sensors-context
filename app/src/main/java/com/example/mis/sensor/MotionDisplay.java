@@ -46,7 +46,7 @@ public class MotionDisplay extends Drawable {
         //get height and width here
         int width = getBounds().width();
         int height = getBounds().height();
-        int graph_height = (int)(height * 0.95);
+        int graph_height = (int)(height * 1.0);
         int graph_width = (int)(width * 1.0);
 
         //fill bg - dark
