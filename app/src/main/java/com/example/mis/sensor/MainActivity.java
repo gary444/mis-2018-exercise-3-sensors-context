@@ -171,6 +171,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     @Override
     protected void onPause() {
         super.onPause();
+
+        //sensors not paused here so app is still operational when sleeping -
+        // like a normal music player
+        // clear up only done in onDestroy()
     }
 
     @Override
