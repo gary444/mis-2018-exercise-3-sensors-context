@@ -33,17 +33,13 @@ import static com.example.mis.sensor.MainActivity.ExerciseMode.CYCLING;
 import static com.example.mis.sensor.MainActivity.ExerciseMode.NONE;
 import static com.example.mis.sensor.MainActivity.ExerciseMode.RUNNING;
 
-public class MainActivity extends AppCompatActivity implements SensorEventListener, SeekBar.OnSeekBarChangeListener, View.OnClickListener, LocationListener {
-
-
+public class MainActivity extends AppCompatActivity implements SensorEventListener, SeekBar.OnSeekBarChangeListener, LocationListener {
 
     public enum ExerciseMode {
         NONE,
         RUNNING,
         CYCLING
     }
-
-
 
     //views
     private CustomGraphView sensor_data_view;
@@ -59,16 +55,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private SeekBar window_size_seek_bar;
     private SeekBar sample_rate_seek_bar;
 
-//    private Button test_btn1;
-//    private Button test_btn2;
-
-    //visual parameters
-    private final int DARK_BG = 0xff222222;
-    private final int LIGHT_BG = 0xffaaaaaa;
-    private final int GRAPH_X_RESOLUTION = 50;
-    private final float SENSOR_GRAPH_SCALE_Y = 0.01f;
-    private final float FFT_GRAPH_SCALE_Y = 0.3f;
-
     //sensor variables
     private SensorManager mSensorManager;
     private Sensor mLinearAccelerometer;
@@ -79,13 +65,11 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private int FFT_WINDOW_SIZE = 64;
     private double dominantFrequency = 0;
     private double fft_energy = 0.0;
-    private final double  MOVEMENT_THRESHOLD = 0.05;
+    private final double  MOVEMENT_THRESHOLD = 0.02;
 
     //data log
     private ArrayList<AccelOutput> accelData = new ArrayList<>();
 
-    private boolean allowModeChange = true;
-    private final long MODE_CHANGE_DELAY = 3000;//ms
     private long time_of_last_mode_change = 0;
     ExerciseMode exercisemode = NONE;
     private double last_known_speed = 0.0;
@@ -97,11 +81,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private static final String TAG = MainActivity.class.getSimpleName();
 
     //location stuff - help from http://findnerd.com/list/view/How-to-Track-Users-Speed-Using-location-getSpeed-GPS-Method-in-Android/34577/
-    private LocationManager locationManager;
     private static final float MIN_UPDATE_DIST = 1;
     private static final long MIN_UPDATE_TIME = 3000;
-    private boolean mLocationPermissionGranted;
     private static final int PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION = 1;
+    private boolean mLocationPermissionGranted;
 
 
 
@@ -144,17 +127,11 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 last_known_speed, time_since_speed_update));
 
         visualiseSensorData();
-        
-//        test_btn1 = findViewById(R.id.test_btn1);
-//        test_btn1.setOnClickListener(this);
-//        test_btn2 = findViewById(R.id.test_btn2);
-//        test_btn2.setOnClickListener(this);
-
-
 
         //location setup
         getLocationPermission();
-        registerForLocationUpdates();
+        if (mLocationPermissionGranted)
+            registerForLocationUpdates();
 
         //set callback for updating last speed update
         final Timer timer = new Timer(true);
@@ -174,7 +151,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         };
         timer.schedule(timerTask, 1000, 1000);
 
-
     }
 
     @Override
@@ -185,23 +161,28 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         sample_rate_seek_bar.setOnSeekBarChangeListener(this);
         window_size_seek_bar.setOnSeekBarChangeListener(this);
 
-        cycling_player = new MusicHandler(this, R.raw.cycling_music, true, "cycling");
-        running_player = new MusicHandler(this, R.raw.running_music, true, "running");
+        if (cycling_player == null)
+            cycling_player = new MusicHandler(this, R.raw.cycling_music, true, "cycling");
+        if (running_player == null)
+            running_player = new MusicHandler(this, R.raw.running_music, true, "running");
 
     }
 
     @Override
     protected void onPause() {
         super.onPause();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
         mSensorManager.unregisterListener(this);
 
         if (cycling_player != null)
             cycling_player.stopAndRelease();
         if (running_player != null)
             running_player.stopAndRelease();
-
     }
-
 
     private boolean sensorInit(){
 
@@ -249,6 +230,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     //sends sensor data to line graph display
     private void visualiseSensorData(){
 
+        final float SENSOR_GRAPH_SCALE_Y = 0.01f;
+        final int GRAPH_X_RESOLUTION = 50;
+
+
         ArrayList<DrawableDataSet> dataSets = new ArrayList<>();
 
         //for 4 lines: x,y,z,magnitude
@@ -270,6 +255,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             dataSets.add(ds);
         }
 
+        final int DARK_BG = 0xff222222;
         sensor_data_view.updateData(dataSets, DARK_BG);
 
     }
@@ -287,6 +273,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         DrawableDataSet ds = new DrawableDataSet(dataToDraw, 0xffff0000, "fft data");
         dataSets.add(ds);
 
+        final int LIGHT_BG = 0xffaaaaaa;
         fft_view.updateData(dataSets, LIGHT_BG);
 
     }
@@ -339,6 +326,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             double maxAmp = 0.0;
             int maxBin = -1;
             fft_energy = Math.sqrt(Math.pow(realPart[0], 2)) / wsize;
+            final float FFT_GRAPH_SCALE_Y = 0.3f;
 
             for (int i = 0; (wsize/2) > i ; i++) {
                 magnitude[i] = FFT_GRAPH_SCALE_Y * Math.sqrt(Math.pow(realPart[i + 1], 2) + Math.pow(imagPart[i + 1], 2));
@@ -363,7 +351,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             if (fft_energy > MOVEMENT_THRESHOLD)
                 fft_dom_freq_label.setText(String.format(Locale.getDefault(), "Dom. Freq. = %8.2f Hz", dominantFrequency));
             else
-                fft_dom_freq_label.setText(String.format(Locale.getDefault(), "Dom. Freq. = n/a (lo input)", dominantFrequency));
+                fft_dom_freq_label.setText("Dom. Freq. = n/a (lo input)");
 
 
             //update mode for testing
@@ -375,6 +363,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     //updates movement type if necessary
     private void checkMovementType(){
 
+        final long MODE_CHANGE_DELAY = 3000;//ms
+
         //check mode was not changed too recently
         if (SystemClock.uptimeMillis() - MODE_CHANGE_DELAY < time_of_last_mode_change)
             return;
@@ -385,29 +375,52 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         mode_map.put(CYCLING, 0);
         mode_map.put(RUNNING, 0);
 
+        //score out of 5 for each metric
 
         if (fft_energy < MOVEMENT_THRESHOLD){ // no energy -> no movement
             setExerciseMode(NONE);
+            time_of_last_mode_change = SystemClock.uptimeMillis();
+            return;
         }
         else {
+
+            //check energy
+            if (fft_energy > 0.1){
+                mode_map.put(RUNNING, mode_map.get(RUNNING) + 3);
+                mode_map.put(CYCLING, mode_map.get(CYCLING) + 2);
+            }
+            else {
+                mode_map.put(CYCLING, mode_map.get(CYCLING) + 3);
+                mode_map.put(RUNNING, mode_map.get(RUNNING) + 1);
+                mode_map.put(NONE, mode_map.get(NONE) + 1);
+            }
+
+
             //check speed
             if (last_known_speed > 50) { // in a vehicle
                 setExerciseMode(NONE);
+                time_of_last_mode_change = SystemClock.uptimeMillis();
                 return;
             }
             else if (last_known_speed > 35){//probably in a vehicle
-                mode_map.put(NONE, mode_map.get(NONE) + 3);
+                mode_map.put(NONE, mode_map.get(NONE) + 4);
                 mode_map.put(CYCLING, mode_map.get(CYCLING) + 1);
             }
-            else if (last_known_speed > 15){//prob cycling
-                mode_map.put(CYCLING, mode_map.get(CYCLING) + 3);
+            else if (last_known_speed > 20){//prob cycling
+                mode_map.put(CYCLING, mode_map.get(CYCLING) + 4);
+                mode_map.put(NONE, mode_map.get(NONE) + 1);
             }
-            else if (last_known_speed > 7){//prob running
+            else if (last_known_speed > 15){//prob cycling or running
+                mode_map.put(CYCLING, mode_map.get(CYCLING) + 3);
+                mode_map.put(RUNNING, mode_map.get(RUNNING) + 1);
+            }
+            else if (last_known_speed > 5){//prob running
                 mode_map.put(RUNNING, mode_map.get(RUNNING) + 3);
                 mode_map.put(CYCLING, mode_map.get(CYCLING) + 1);
             }
             else {//prob walking/stationary
-                mode_map.put(NONE, mode_map.get(NONE) + 3);
+                mode_map.put(NONE, mode_map.get(NONE) + 4);
+                mode_map.put(RUNNING, mode_map.get(RUNNING) + 1);
             }
 
             //check dominant frequency
@@ -470,30 +483,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     @Override
     public void onStopTrackingTouch(SeekBar seekBar) {}
 
-
-    //button for testing
-    @Override
-    public void onClick(View v) {
-
-
-//        if (v == test_btn1){
-//
-//            if (exercisemode == RUNNING)
-//                setExerciseMode(NONE);
-//            else
-//                setExerciseMode(RUNNING);
-//
-//
-//        }
-//        else if (v == test_btn2){
-//
-//            if (exercisemode == CYCLING)
-//                setExerciseMode(NONE);
-//            else
-//                setExerciseMode(CYCLING);
-//        }
-    }
-
     //controls music players when changing modes
     private void setExerciseMode (ExerciseMode targetMode){
 
@@ -518,6 +507,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
 
     public void registerForLocationUpdates() {
+        LocationManager locationManager;
         try {
             locationManager = (LocationManager) this.getSystemService(LOCATION_SERVICE);
                 locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, MIN_UPDATE_TIME, MIN_UPDATE_DIST, this);

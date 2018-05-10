@@ -27,7 +27,6 @@ public class MusicHandler {
     private final static float FLOAT_VOLUME_MIN = 0;
 
     public MusicHandler(Context context, int resource_id, boolean setLooping, String name) {
-//        this.context = context;
         playing = false;
         this.name = name;
         mediaPlayer = MediaPlayer.create(context, resource_id);

@@ -33,8 +33,8 @@ public class FFT {
     int n, m;
 
     // Lookup tables. Only need to recompute when size of FFT changes.
-    double[] cos;
-    double[] sin;
+    private double[] cos;
+    private double[] sin;
 
     public FFT(int n) {
         this.n = n; // window size

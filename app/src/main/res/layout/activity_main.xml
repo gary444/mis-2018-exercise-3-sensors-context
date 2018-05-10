@@ -70,10 +70,10 @@
         android:id="@+id/sample_rate_seek_bar"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="5"
-        android:min="10"
-        android:max="1000"
-        />
+        android:layout_weight="5"/>
+        <!--android:min="10"-->
+        <!--android:max="1000"-->
+        <!--/>-->
 
     <TextView
         android:id="@+id/window_size_label"
@@ -88,33 +88,11 @@
         android:id="@+id/window_size_seek_bar"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="5"
-        android:min="4"
-        android:max="10"
-        />
+        android:layout_weight="5"/>
+        <!--android:min="4"-->
+        <!--android:max="10"-->
+        <!--/>-->
 
-    <!--<LinearLayout-->
-        <!--android:layout_width="match_parent"-->
-        <!--android:layout_height="0dp"-->
-        <!--android:layout_weight="10"-->
-        <!--android:orientation="horizontal">-->
-
-        <!--<Button-->
-            <!--android:id="@+id/test_btn1"-->
-            <!--android:layout_width="wrap_content"-->
-            <!--android:layout_height="match_parent"-->
-            <!--android:layout_weight="50"-->
-            <!--android:text="running"-->
-            <!--/>-->
-        <!--<Button-->
-            <!--android:id="@+id/test_btn2"-->
-            <!--android:layout_width="wrap_content"-->
-            <!--android:layout_height="match_parent"-->
-            <!--android:layout_weight="50"-->
-            <!--android:text="cycling"-->
-            <!--/>-->
-
-    <!--</LinearLayout>-->
 
     <TextView
         android:id="@+id/mode_output"
